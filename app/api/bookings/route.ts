@@ -5,11 +5,8 @@ import Booking from "@/models/Booking";
 
 /* ======================================================
    GET BOOKINGS
-   Supports:
-   - all bookings
-   - ?date=YYYY-MM-DD
+   - ?date=YYYY-MM-DD  → occupancy for selected date
    - ?propertyId=xxx
-   - ?active=true   (today's checked-in guests)
 ====================================================== */
 export async function GET(req: Request) {
   try {
@@ -18,36 +15,25 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get("date");
     const propertyId = searchParams.get("propertyId");
-    const active = searchParams.get("active");
 
     const query: any = {};
 
-    // Filter by property
     if (propertyId) {
       query.propertyId = propertyId;
     }
 
-    // Filter by check-in date (daily income)
+    // OCCUPANCY LOGIC
     if (date) {
-      const start = new Date(date);
-      const end = new Date(date);
-      end.setDate(end.getDate() + 1);
+      const selected = new Date(date);
 
-      query.checkInDate = { $gte: start, $lt: end };
-    }
-
-    // Active guests (room occupancy)
-    if (active === "true") {
-      const today = new Date();
-      query.checkInDate = { $lte: today };
-      query.checkOutDate = { $gt: today };
-      query.status = "checkin";
+      query.checkInDate = { $lte: selected };
+      query.checkOutDate = { $gt: selected };
+      query.status = { $ne: "cancel" };
     }
 
     const bookings = await Booking.find(query)
       .populate("propertyId")
-      .populate("roomId")
-      .sort({ createdAt: -1 });
+      .sort({ checkInDate: 1 });
 
     return NextResponse.json(bookings);
   } catch (error) {
@@ -82,9 +68,6 @@ export async function POST(req: Request) {
 
 /* ======================================================
    UPDATE BOOKING
-   Uses:
-   - status change
-   - edit guest details
 ====================================================== */
 export async function PATCH(req: Request) {
   try {
@@ -114,8 +97,7 @@ export async function PATCH(req: Request) {
 }
 
 /* ======================================================
-   DELETE / CANCEL BOOKING
-   (soft delete using status = cancel)
+   CANCEL BOOKING (soft delete)
 ====================================================== */
 export async function DELETE(req: Request) {
   try {
@@ -132,7 +114,7 @@ export async function DELETE(req: Request) {
 
     const booking = await Booking.findByIdAndUpdate(
       bookingId,
-      { status: "cancel", roomId: null },
+      { status: "cancel" },
       { new: true }
     );
 

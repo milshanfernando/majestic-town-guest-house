@@ -34,6 +34,10 @@ export default function BookingPage() {
 
   /* ================= STATE ================= */
 
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [selectedDate, setSelectedDate] = useState(today);
+
   const [form, setForm] = useState<BookingForm>({
     guestName: "",
     phone: "",
@@ -42,7 +46,7 @@ export default function BookingPage() {
     platform: "Booking.com",
     paymentMethod: "online",
     amount: "",
-    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentDate: today,
     checkInDate: "",
     checkOutDate: "",
     status: "booked",
@@ -55,9 +59,9 @@ export default function BookingPage() {
     queryFn: () => fetchJSON("/api/properties"),
   });
 
-  const { data: todayBookings = [] } = useQuery<any[]>({
-    queryKey: ["today-bookings"],
-    queryFn: () => fetchJSON("/api/bookings?today=true"),
+  const { data: occupancies = [] } = useQuery<any[]>({
+    queryKey: ["occupancies", selectedDate],
+    queryFn: () => fetchJSON(`/api/bookings?date=${selectedDate}`),
   });
 
   /* ================= MUTATION ================= */
@@ -70,9 +74,8 @@ export default function BookingPage() {
         body: JSON.stringify(form),
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["today-bookings"] });
+      qc.invalidateQueries({ queryKey: ["occupancies"] });
 
-      // reset
       setForm({
         guestName: "",
         phone: "",
@@ -81,7 +84,7 @@ export default function BookingPage() {
         platform: "Booking.com",
         paymentMethod: "online",
         amount: "",
-        paymentDate: new Date().toISOString().slice(0, 10),
+        paymentDate: today,
         checkInDate: "",
         checkOutDate: "",
         status: "booked",
@@ -101,9 +104,12 @@ export default function BookingPage() {
 
   return (
     <div className="p-8 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">📝 New Booking</h1>
+      <h1 className="text-3xl font-bold mb-6">🏨 Booking Management</h1>
 
-      <div className="bg-white rounded-xl shadow p-6 max-w-xl">
+      {/* ================= NEW BOOKING ================= */}
+      <div className="bg-white rounded-xl shadow p-6 max-w-xl mb-10">
+        <h2 className="text-xl font-semibold mb-4">📝 New Booking</h2>
+
         <div className="grid grid-cols-2 gap-3">
           <input
             name="guestName"
@@ -209,19 +215,35 @@ export default function BookingPage() {
         </button>
       </div>
 
-      {/* ================= TODAY BOOKINGS ================= */}
-      <h2 className="text-2xl font-semibold mt-10 mb-4">📅 Today’s Bookings</h2>
+      {/* ================= OCCUPANCY ================= */}
+      <div className="mb-4 flex items-center gap-3">
+        <label className="font-medium">📅 Select Date</label>
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="border p-2 rounded"
+        />
+      </div>
+
+      <h2 className="text-2xl font-semibold mb-4">
+        🏠 Occupancy for {selectedDate}
+      </h2>
 
       <div className="grid md:grid-cols-3 gap-4">
-        {todayBookings.map((b) => (
+        {occupancies.length === 0 && (
+          <p className="text-gray-500">No occupied rooms</p>
+        )}
+
+        {occupancies.map((b) => (
           <div key={b._id} className="bg-white shadow rounded p-4">
             <p className="font-semibold">{b.guestName}</p>
-            <p className="text-sm">🏠 {b.propertyId?.name}</p>
+            <p className="text-sm">🏨 {b.propertyId?.name}</p>
             <p className="text-sm">
-              💰 {b.amount} ({b.paymentMethod})
+              📅 {b.checkInDate?.slice(0, 10)} → {b.checkOutDate?.slice(0, 10)}
             </p>
             <p className="text-xs text-gray-500">
-              💳 Paid: {b.paymentDate?.slice(0, 10)}
+              💰 {b.amount} ({b.paymentMethod})
             </p>
           </div>
         ))}
