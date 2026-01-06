@@ -5,9 +5,9 @@ import Booking from "@/models/Booking";
 
 /* ======================================================
    GET BOOKINGS
-   - ?date=YYYY-MM-DD  → occupancy for selected date
+   - ?date=YYYY-MM-DD → occupancy for selected date
    - ?propertyId=xxx
-   - Returns bookings with "type": "checkin" | "checkout" | "stay"
+   - Includes guests checking in and checking out that day
 ====================================================== */
 export async function GET(req: Request) {
   try {
@@ -17,65 +17,48 @@ export async function GET(req: Request) {
     const dateParam =
       searchParams.get("date") || new Date().toISOString().slice(0, 10);
     const propertyId = searchParams.get("propertyId");
-    const unassigned = searchParams.get("unassigned");
 
     const query: any = {};
 
-    if (propertyId) {
-      query.propertyId = propertyId;
-    }
+    if (propertyId) query.propertyId = propertyId;
 
-    // Only unassigned bookings
-    if (unassigned === "true") {
-      query.roomId = { $exists: false };
-      query.status = { $ne: "cancel" };
+    const selectedDate = new Date(dateParam);
+    selectedDate.setHours(0, 0, 0, 0);
 
-      const unassignedBookings = await Booking.find(query)
-        .populate("propertyId")
-        .sort({ checkInDate: 1 });
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
 
-      return NextResponse.json(unassignedBookings);
-    }
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-    // Filter by selected date
-    if (dateParam) {
-      const selected = new Date(dateParam);
-      selected.setHours(0, 0, 0, 0);
-
-      const startOfDay = new Date(selected);
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date(selected);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      query.checkInDate = { $lte: endOfDay };
-      query.checkOutDate = { $gte: startOfDay };
-      query.status = { $ne: "cancel" };
-    }
-
-    const bookings = await Booking.find(query)
+    // Find bookings that either:
+    // - Check in today OR
+    // - Check out today OR
+    // - Already staying today
+    const bookings = await Booking.find({
+      ...query,
+      status: { $ne: "cancel" },
+      $or: [
+        { checkInDate: { $gte: startOfDay, $lte: endOfDay } },
+        { checkOutDate: { $gte: startOfDay, $lte: endOfDay } },
+        { checkInDate: { $lte: endOfDay }, checkOutDate: { $gte: startOfDay } },
+      ],
+    })
       .populate("propertyId")
       .sort({ checkInDate: 1 });
 
-    // Add type for frontend convenience
+    // Add "type" field for frontend
     const bookingsWithType = bookings.map((b: any) => {
       const checkIn = new Date(b.checkInDate);
       const checkOut = new Date(b.checkOutDate);
-
       checkIn.setHours(0, 0, 0, 0);
       checkOut.setHours(0, 0, 0, 0);
 
-      const selected = new Date(dateParam);
-      selected.setHours(0, 0, 0, 0);
-
       let type: "checkin" | "checkout" | "stay" = "stay";
-      if (checkIn.getTime() === selected.getTime()) type = "checkin";
-      else if (checkOut.getTime() === selected.getTime()) type = "checkout";
+      if (checkIn.getTime() === selectedDate.getTime()) type = "checkin";
+      else if (checkOut.getTime() === selectedDate.getTime()) type = "checkout";
 
-      return {
-        ...b.toObject(),
-        type,
-      };
+      return { ...b.toObject(), type };
     });
 
     return NextResponse.json(bookingsWithType);
@@ -92,12 +75,10 @@ export async function POST(req: Request) {
   try {
     await connectDB();
     const data = await req.json();
-
     const booking = await Booking.create({
       ...data,
       status: data.status || "booked",
     });
-
     return NextResponse.json(booking);
   } catch (error) {
     console.error("BOOKING POST ERROR:", error);
@@ -109,39 +90,34 @@ export async function POST(req: Request) {
 }
 
 /* ======================================================
-   UPDATE / ASSIGN / CHECKIN / CHECKOUT
+   UPDATE BOOKING
+   - assign, checkin, checkout
 ====================================================== */
 export async function PATCH(req: Request) {
   try {
     await connectDB();
     const { bookingId, action, roomId } = await req.json();
 
-    if (!bookingId && !roomId) {
+    if (!bookingId)
       return NextResponse.json(
-        { error: "bookingId or roomId required" },
+        { error: "bookingId required" },
         { status: 400 }
       );
-    }
 
     let booking;
-
     if (action === "assign") {
       booking = await Booking.findByIdAndUpdate(
         bookingId,
         { roomId },
         { new: true }
       );
-    }
-
-    if (action === "checkin") {
+    } else if (action === "checkin") {
       booking = await Booking.findByIdAndUpdate(
         bookingId,
         { status: "checked_in" },
         { new: true }
       );
-    }
-
-    if (action === "checkout") {
+    } else if (action === "checkout") {
       booking = await Booking.findByIdAndUpdate(
         bookingId,
         { status: "checked_out" },
@@ -166,20 +142,17 @@ export async function DELETE(req: Request) {
   try {
     await connectDB();
     const { bookingId } = await req.json();
-
-    if (!bookingId) {
+    if (!bookingId)
       return NextResponse.json(
         { error: "bookingId required" },
         { status: 400 }
       );
-    }
 
     const booking = await Booking.findByIdAndUpdate(
       bookingId,
       { status: "cancel" },
       { new: true }
     );
-
     return NextResponse.json(booking);
   } catch (error) {
     console.error("BOOKING DELETE ERROR:", error);

@@ -5,16 +5,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 /* ===================== TYPES ===================== */
+
 interface Property {
   _id: string;
   name: string;
 }
-
 interface Room {
   _id: string;
   roomNo: string;
 }
-
 interface Booking {
   _id: string;
   guestName: string;
@@ -22,10 +21,11 @@ interface Booking {
   propertyId?: { _id: string; name: string };
   checkInDate: string;
   checkOutDate: string;
-  status: "booked" | "checked_in" | "checked_out" | "cancel";
+  type?: "checkin" | "checkout" | "stay";
 }
 
 /* ===================== PAGE ===================== */
+
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
@@ -47,7 +47,7 @@ export default function RoomOccupancyPage() {
       fetch(`/api/rooms?propertyId=${propertyId}`).then((res) => res.json()),
   });
 
-  /* ---------------- Occupied Rooms (by date) ---------------- */
+  /* ---------------- Bookings ---------------- */
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["occupancies", propertyId, selectedDate],
     enabled: !!propertyId,
@@ -57,7 +57,6 @@ export default function RoomOccupancyPage() {
       ),
   });
 
-  /* ---------------- Unassigned Bookings ---------------- */
   const { data: unassigned = [] } = useQuery<Booking[]>({
     queryKey: ["unassignedBookings", propertyId],
     enabled: !!propertyId,
@@ -67,46 +66,30 @@ export default function RoomOccupancyPage() {
       ),
   });
 
-  /* ===================== MUTATIONS ===================== */
-  const roomMutation = useMutation({
+  /* ---------------- Mutations ---------------- */
+  const bookingMutation = useMutation({
     mutationFn: (payload: any) =>
-      fetch("/api/rooms", {
+      fetch("/api/bookings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["occupancies"] });
-      queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["unassignedBookings"] });
     },
   });
 
-  /* ===================== HELPERS ===================== */
+  /* ---------------- Helpers ---------------- */
   const bookingsForRoom = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
 
-  const getBookingType = (booking: Booking) => {
-    const selected = new Date(selectedDate);
-    selected.setHours(0, 0, 0, 0);
-
-    const checkIn = new Date(booking.checkInDate);
-    checkIn.setHours(0, 0, 0, 0);
-
-    const checkOut = new Date(booking.checkOutDate);
-    checkOut.setHours(0, 0, 0, 0);
-
-    if (checkIn.getTime() === selected.getTime()) return "checkin";
-    if (checkOut.getTime() === selected.getTime()) return "checkout";
-    return "stay";
-  };
-
-  /* ===================== UI ===================== */
+  /* ---------------- UI ---------------- */
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
 
-      {/* ---------------- Filters ---------------- */}
+      {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
         <select
           className="border rounded px-4 py-2 shadow"
@@ -131,34 +114,78 @@ export default function RoomOccupancyPage() {
 
       {roomsLoading && <p>Loading rooms...</p>}
 
-      {/* ---------------- Rooms Grid ---------------- */}
+      {/* Rooms Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {rooms.map((room) => {
           const roomBookings = bookingsForRoom(room._id);
+          const isOccupied = roomBookings.length > 0;
 
           return (
             <div
               key={room._id}
               className={`rounded-xl shadow-md p-5 ${
-                roomBookings.length ? "bg-red-50" : "bg-green-50"
+                isOccupied ? "bg-red-50" : "bg-green-50"
               }`}
             >
               <div className="flex justify-between mb-2">
                 <h2 className="text-xl font-semibold">Room {room.roomNo}</h2>
                 <span
                   className={`text-xs px-3 py-1 rounded-full ${
-                    roomBookings.length ? "bg-red-200" : "bg-green-200"
+                    isOccupied ? "bg-red-200" : "bg-green-200"
                   }`}
                 >
-                  {roomBookings.length ? "Occupied" : "Available"}
+                  {isOccupied ? "Occupied" : "Available"}
                 </span>
               </div>
 
-              {roomBookings.length === 0 ? (
+              {roomBookings.map((b) => (
+                <div
+                  key={b._id}
+                  className="mb-3 p-2 rounded border border-gray-200 bg-white shadow-sm"
+                >
+                  <p className="font-medium">👤 {b.guestName}</p>
+                  <p className="text-sm text-gray-600">
+                    📅 {b.checkInDate.slice(0, 10)} →{" "}
+                    {b.checkOutDate.slice(0, 10)}
+                  </p>
+
+                  <div className="flex gap-2 mt-2">
+                    {b.type === "checkin" && (
+                      <button
+                        onClick={() =>
+                          bookingMutation.mutate({
+                            bookingId: b._id,
+                            action: "checkin",
+                          })
+                        }
+                        className="bg-blue-500 text-white px-3 py-1 rounded"
+                      >
+                        Check-in
+                      </button>
+                    )}
+                    {b.type === "checkout" && (
+                      <button
+                        onClick={() =>
+                          bookingMutation.mutate({
+                            bookingId: b._id,
+                            action: "checkout",
+                          })
+                        }
+                        className="bg-red-600 text-white px-3 py-1 rounded"
+                      >
+                        Check-out
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {/* Unassigned Guests */}
+              {!isOccupied && (
                 <select
                   className="border rounded w-full mt-3 p-2"
                   onChange={(e) =>
-                    roomMutation.mutate({
+                    bookingMutation.mutate({
                       action: "assign",
                       roomId: room._id,
                       bookingId: e.target.value,
@@ -172,62 +199,6 @@ export default function RoomOccupancyPage() {
                     </option>
                   ))}
                 </select>
-              ) : (
-                roomBookings.map((booking) => {
-                  const type = getBookingType(booking);
-                  return (
-                    <div
-                      key={booking._id}
-                      className="mt-3 p-3 rounded bg-white shadow"
-                    >
-                      <p className="font-medium">👤 {booking.guestName}</p>
-
-                      {type === "checkout" && (
-                        <>
-                          <span className="text-xs bg-yellow-200 px-2 py-1 rounded">
-                            Checkout Today
-                          </span>
-                          <button
-                            onClick={() =>
-                              roomMutation.mutate({
-                                action: "checkout",
-                                bookingId: booking._id,
-                              })
-                            }
-                            className="block mt-2 bg-red-600 text-white px-3 py-1 rounded"
-                          >
-                            Checkout
-                          </button>
-                        </>
-                      )}
-
-                      {type === "checkin" && (
-                        <>
-                          <span className="text-xs bg-blue-200 px-2 py-1 rounded">
-                            Booked (Check-in Today)
-                          </span>
-                          <button
-                            onClick={() =>
-                              roomMutation.mutate({
-                                action: "checkin",
-                                bookingId: booking._id,
-                              })
-                            }
-                            className="block mt-2 bg-green-600 text-white px-3 py-1 rounded"
-                          >
-                            Check-in
-                          </button>
-                        </>
-                      )}
-
-                      {type === "stay" && (
-                        <span className="text-xs bg-red-200 px-2 py-1 rounded">
-                          Occupied
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
               )}
             </div>
           );
