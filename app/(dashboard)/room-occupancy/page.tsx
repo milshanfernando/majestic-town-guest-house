@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 /* ===================== TYPES ===================== */
-
 interface Property {
   _id: string;
   name: string;
@@ -23,27 +22,24 @@ interface Booking {
   propertyId?: { _id: string; name: string };
   checkInDate: string;
   checkOutDate: string;
+  status: "booked" | "checked_in" | "checked_out" | "cancel";
 }
 
 /* ===================== PAGE ===================== */
-
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
-
   const today = new Date().toISOString().slice(0, 10);
 
   const [propertyId, setPropertyId] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
 
   /* ---------------- Properties ---------------- */
-
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["properties"],
     queryFn: () => fetch("/api/properties").then((res) => res.json()),
   });
 
   /* ---------------- Rooms ---------------- */
-
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<Room[]>({
     queryKey: ["rooms", propertyId],
     enabled: !!propertyId,
@@ -52,7 +48,6 @@ export default function RoomOccupancyPage() {
   });
 
   /* ---------------- Occupied Rooms (by date) ---------------- */
-
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["occupancies", propertyId, selectedDate],
     enabled: !!propertyId,
@@ -63,7 +58,6 @@ export default function RoomOccupancyPage() {
   });
 
   /* ---------------- Unassigned Bookings ---------------- */
-
   const { data: unassigned = [] } = useQuery<Booking[]>({
     queryKey: ["unassignedBookings", propertyId],
     enabled: !!propertyId,
@@ -74,7 +68,6 @@ export default function RoomOccupancyPage() {
   });
 
   /* ===================== MUTATIONS ===================== */
-
   const roomMutation = useMutation({
     mutationFn: (payload: any) =>
       fetch("/api/rooms", {
@@ -90,12 +83,25 @@ export default function RoomOccupancyPage() {
   });
 
   /* ===================== HELPERS ===================== */
+  const bookingsForRoom = (roomId: string) =>
+    bookings.filter((b) => b.roomId === roomId);
 
-  const bookingForRoom = (roomId: string) =>
-    bookings.find((b) => b.roomId === roomId);
+  const getBookingType = (booking: Booking) => {
+    const selected = new Date(selectedDate);
+    selected.setHours(0, 0, 0, 0);
+
+    const checkIn = new Date(booking.checkInDate);
+    checkIn.setHours(0, 0, 0, 0);
+
+    const checkOut = new Date(booking.checkOutDate);
+    checkOut.setHours(0, 0, 0, 0);
+
+    if (checkIn.getTime() === selected.getTime()) return "checkin";
+    if (checkOut.getTime() === selected.getTime()) return "checkout";
+    return "stay";
+  };
 
   /* ===================== UI ===================== */
-
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
@@ -128,67 +134,27 @@ export default function RoomOccupancyPage() {
       {/* ---------------- Rooms Grid ---------------- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {rooms.map((room) => {
-          const booking = bookingForRoom(room._id);
+          const roomBookings = bookingsForRoom(room._id);
 
           return (
             <div
               key={room._id}
               className={`rounded-xl shadow-md p-5 ${
-                booking ? "bg-red-50" : "bg-green-50"
+                roomBookings.length ? "bg-red-50" : "bg-green-50"
               }`}
             >
               <div className="flex justify-between mb-2">
                 <h2 className="text-xl font-semibold">Room {room.roomNo}</h2>
                 <span
                   className={`text-xs px-3 py-1 rounded-full ${
-                    booking ? "bg-red-200" : "bg-green-200"
+                    roomBookings.length ? "bg-red-200" : "bg-green-200"
                   }`}
                 >
-                  {booking ? "Occupied" : "Available"}
+                  {roomBookings.length ? "Occupied" : "Available"}
                 </span>
               </div>
 
-              {booking ? (
-                <>
-                  <p className="font-medium">👤 {booking.guestName}</p>
-                  <p className="text-sm text-gray-600">
-                    📅 {booking.checkInDate.slice(0, 10)} →{" "}
-                    {new Date(
-                      new Date(booking.checkOutDate).setDate(
-                        new Date(booking.checkOutDate).getDate() - 1
-                      )
-                    )
-                      .toISOString()
-                      .slice(0, 10)}
-                  </p>
-
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() =>
-                        roomMutation.mutate({
-                          action: "remove",
-                          bookingId: booking._id,
-                        })
-                      }
-                      className="bg-yellow-500 text-white px-3 py-1 rounded"
-                    >
-                      Remove
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        roomMutation.mutate({
-                          action: "checkout",
-                          bookingId: booking._id,
-                        })
-                      }
-                      className="bg-red-600 text-white px-3 py-1 rounded"
-                    >
-                      Checkout
-                    </button>
-                  </div>
-                </>
-              ) : (
+              {roomBookings.length === 0 ? (
                 <select
                   className="border rounded w-full mt-3 p-2"
                   onChange={(e) =>
@@ -206,6 +172,62 @@ export default function RoomOccupancyPage() {
                     </option>
                   ))}
                 </select>
+              ) : (
+                roomBookings.map((booking) => {
+                  const type = getBookingType(booking);
+                  return (
+                    <div
+                      key={booking._id}
+                      className="mt-3 p-3 rounded bg-white shadow"
+                    >
+                      <p className="font-medium">👤 {booking.guestName}</p>
+
+                      {type === "checkout" && (
+                        <>
+                          <span className="text-xs bg-yellow-200 px-2 py-1 rounded">
+                            Checkout Today
+                          </span>
+                          <button
+                            onClick={() =>
+                              roomMutation.mutate({
+                                action: "checkout",
+                                bookingId: booking._id,
+                              })
+                            }
+                            className="block mt-2 bg-red-600 text-white px-3 py-1 rounded"
+                          >
+                            Checkout
+                          </button>
+                        </>
+                      )}
+
+                      {type === "checkin" && (
+                        <>
+                          <span className="text-xs bg-blue-200 px-2 py-1 rounded">
+                            Booked (Check-in Today)
+                          </span>
+                          <button
+                            onClick={() =>
+                              roomMutation.mutate({
+                                action: "checkin",
+                                bookingId: booking._id,
+                              })
+                            }
+                            className="block mt-2 bg-green-600 text-white px-3 py-1 rounded"
+                          >
+                            Check-in
+                          </button>
+                        </>
+                      )}
+
+                      {type === "stay" && (
+                        <span className="text-xs bg-red-200 px-2 py-1 rounded">
+                          Occupied
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           );
