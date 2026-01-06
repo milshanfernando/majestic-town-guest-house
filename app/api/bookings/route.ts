@@ -23,11 +23,16 @@ export async function GET(req: Request) {
     }
 
     // OCCUPANCY LOGIC
+    // OCCUPANCY LOGIC (CORRECT)
     if (date) {
-      const selected = new Date(date);
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
 
-      query.checkInDate = { $lte: selected };
-      query.checkOutDate = { $gte: selected };
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      query.checkInDate = { $lte: endOfDay };
+      query.checkOutDate = { $gte: startOfDay };
       query.status = { $ne: "cancel" };
     }
 
