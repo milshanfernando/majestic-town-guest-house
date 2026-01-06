@@ -14,15 +14,26 @@ export async function GET(req: Request) {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
-    const dateParam =
-      searchParams.get("date") || new Date().toISOString().slice(0, 10);
+    const dateParam = searchParams.get("date");
     const propertyId = searchParams.get("propertyId");
+    const unassigned = searchParams.get("unassigned");
 
+    // IF fetching unassigned guests
+    if (unassigned === "true") {
+      const bookings = await Booking.find({
+        roomId: { $exists: false },
+        status: { $ne: "cancel" },
+      }).sort({
+        checkInDate: 1,
+      });
+      return NextResponse.json(bookings);
+    }
+
+    // Otherwise, normal occupancy logic
     const query: any = {};
-
     if (propertyId) query.propertyId = propertyId;
 
-    const selectedDate = new Date(dateParam);
+    const selectedDate = dateParam ? new Date(dateParam) : new Date();
     selectedDate.setHours(0, 0, 0, 0);
 
     const startOfDay = new Date(selectedDate);
@@ -31,10 +42,6 @@ export async function GET(req: Request) {
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Find bookings that either:
-    // - Check in today OR
-    // - Check out today OR
-    // - Already staying today
     const bookings = await Booking.find({
       ...query,
       status: { $ne: "cancel" },
@@ -47,7 +54,7 @@ export async function GET(req: Request) {
       .populate("propertyId")
       .sort({ checkInDate: 1 });
 
-    // Add "type" field for frontend
+    // Add type field for frontend
     const bookingsWithType = bookings.map((b: any) => {
       const checkIn = new Date(b.checkInDate);
       const checkOut = new Date(b.checkOutDate);

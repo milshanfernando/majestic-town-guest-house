@@ -4,8 +4,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-/* ===================== TYPES ===================== */
-
 interface Property {
   _id: string;
   name: string;
@@ -21,10 +19,9 @@ interface Booking {
   propertyId?: { _id: string; name: string };
   checkInDate: string;
   checkOutDate: string;
+  status: string;
   type?: "checkin" | "checkout" | "stay";
 }
-
-/* ===================== PAGE ===================== */
 
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
@@ -33,13 +30,13 @@ export default function RoomOccupancyPage() {
   const [propertyId, setPropertyId] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
 
-  /* ---------------- Properties ---------------- */
+  // Properties
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["properties"],
     queryFn: () => fetch("/api/properties").then((res) => res.json()),
   });
 
-  /* ---------------- Rooms ---------------- */
+  // Rooms
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<Room[]>({
     queryKey: ["rooms", propertyId],
     enabled: !!propertyId,
@@ -47,7 +44,7 @@ export default function RoomOccupancyPage() {
       fetch(`/api/rooms?propertyId=${propertyId}`).then((res) => res.json()),
   });
 
-  /* ---------------- Bookings ---------------- */
+  // Bookings for occupancy
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["occupancies", propertyId, selectedDate],
     enabled: !!propertyId,
@@ -57,16 +54,14 @@ export default function RoomOccupancyPage() {
       ),
   });
 
+  // **Unassigned guests: all properties**
   const { data: unassigned = [] } = useQuery<Booking[]>({
-    queryKey: ["unassignedBookings", propertyId],
-    enabled: !!propertyId,
+    queryKey: ["unassignedBookings"],
     queryFn: () =>
-      fetch(`/api/bookings?unassigned=true&propertyId=${propertyId}`).then(
-        (res) => res.json()
-      ),
+      fetch(`/api/bookings?unassigned=true`).then((res) => res.json()),
   });
 
-  /* ---------------- Mutations ---------------- */
+  // Mutations
   const bookingMutation = useMutation({
     mutationFn: (payload: any) =>
       fetch("/api/bookings", {
@@ -80,11 +75,9 @@ export default function RoomOccupancyPage() {
     },
   });
 
-  /* ---------------- Helpers ---------------- */
   const bookingsForRoom = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
 
-  /* ---------------- UI ---------------- */
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
@@ -150,7 +143,7 @@ export default function RoomOccupancyPage() {
                   </p>
 
                   <div className="flex gap-2 mt-2">
-                    {b.type === "checkin" && (
+                    {b.type === "checkin" && b.status === "booked" && (
                       <button
                         onClick={() =>
                           bookingMutation.mutate({
@@ -180,7 +173,7 @@ export default function RoomOccupancyPage() {
                 </div>
               ))}
 
-              {/* Unassigned Guests */}
+              {/* Unassigned Guests (all properties) */}
               {!isOccupied && (
                 <select
                   className="border rounded w-full mt-3 p-2"
@@ -195,7 +188,7 @@ export default function RoomOccupancyPage() {
                   <option value="">Assign Guest</option>
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
-                      {b.guestName}
+                      {b.guestName} ({b.propertyId?.name || "No Property"})
                     </option>
                   ))}
                 </select>
