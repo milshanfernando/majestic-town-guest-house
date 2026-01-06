@@ -75,8 +75,22 @@ export default function RoomOccupancyPage() {
     },
   });
 
-  const bookingsForRoom = (roomId: string) =>
+  // Filter bookings for a room
+  const bookingsForRoomOnDate = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
+
+  // Determine if room is available for assignment
+  const isRoomAvailable = (roomId: string) => {
+    const roomBookings = bookingsForRoomOnDate(roomId);
+
+    if (roomBookings.length === 0) return true;
+
+    // Room is available if all bookings for today are checkouts
+    return roomBookings.every(
+      (b) =>
+        b.type === "checkout" && b.checkOutDate.slice(0, 10) === selectedDate
+    );
+  };
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
@@ -110,39 +124,55 @@ export default function RoomOccupancyPage() {
       {/* Rooms Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {rooms.map((room) => {
-          const roomBookings = bookingsForRoom(room._id);
-          const isOccupied = roomBookings.length > 0;
+          const roomBookings = bookingsForRoomOnDate(room._id);
+          const isAvailable = isRoomAvailable(room._id);
 
           return (
             <div
               key={room._id}
               className={`rounded-xl shadow-md p-5 ${
-                isOccupied ? "bg-red-50" : "bg-green-50"
+                isAvailable ? "bg-green-50" : "bg-red-50"
               }`}
             >
-              <div className="flex justify-between mb-2">
+              <div className="flex justify-between mb-4">
                 <h2 className="text-xl font-semibold">Room {room.roomNo}</h2>
                 <span
-                  className={`text-xs px-3 py-1 rounded-full ${
-                    isOccupied ? "bg-red-200" : "bg-green-200"
+                  className={`text-xs px-3 py-1 rounded-full font-medium ${
+                    isAvailable
+                      ? "bg-green-200 text-green-800"
+                      : "bg-red-200 text-red-800"
                   }`}
                 >
-                  {isOccupied ? "Occupied" : "Available"}
+                  {isAvailable ? "Available" : "Occupied"}
                 </span>
               </div>
 
+              {/* Guest Cards */}
               {roomBookings.map((b) => (
                 <div
                   key={b._id}
-                  className="mb-3 p-2 rounded border border-gray-200 bg-white shadow-sm"
+                  className="mb-4 p-4 rounded-lg bg-white shadow hover:shadow-lg transition-shadow"
                 >
-                  <p className="font-medium">👤 {b.guestName}</p>
-                  <p className="text-sm text-gray-600">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-semibold text-lg">👤 {b.guestName}</p>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        b.status === "checked_out"
+                          ? "bg-gray-200 text-gray-800"
+                          : b.type === "checkin"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {b.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">
                     📅 {b.checkInDate.slice(0, 10)} →{" "}
                     {b.checkOutDate.slice(0, 10)}
                   </p>
 
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex gap-2">
                     {b.type === "checkin" && b.status === "booked" && (
                       <button
                         onClick={() =>
@@ -151,12 +181,12 @@ export default function RoomOccupancyPage() {
                             action: "checkin",
                           })
                         }
-                        className="bg-blue-500 text-white px-3 py-1 rounded"
+                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
                       >
                         Check-in
                       </button>
                     )}
-                    {b.type === "checkout" && (
+                    {b.type === "checkout" && b.status !== "checked_out" && (
                       <button
                         onClick={() =>
                           bookingMutation.mutate({
@@ -164,7 +194,7 @@ export default function RoomOccupancyPage() {
                             action: "checkout",
                           })
                         }
-                        className="bg-red-600 text-white px-3 py-1 rounded"
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors"
                       >
                         Check-out
                       </button>
@@ -173,8 +203,8 @@ export default function RoomOccupancyPage() {
                 </div>
               ))}
 
-              {/* Unassigned Guests (all properties) */}
-              {!isOccupied && (
+              {/* Unassigned Guests */}
+              {isAvailable && (
                 <select
                   className="border rounded w-full mt-3 p-2"
                   onChange={(e) =>
