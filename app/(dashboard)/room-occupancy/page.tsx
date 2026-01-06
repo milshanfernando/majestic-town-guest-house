@@ -30,13 +30,13 @@ export default function RoomOccupancyPage() {
   const [propertyId, setPropertyId] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
 
-  // Properties
+  /* ================= QUERIES ================= */
+
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["properties"],
     queryFn: () => fetch("/api/properties").then((res) => res.json()),
   });
 
-  // Rooms
   const { data: rooms = [], isLoading: roomsLoading } = useQuery<Room[]>({
     queryKey: ["rooms", propertyId],
     enabled: !!propertyId,
@@ -44,7 +44,6 @@ export default function RoomOccupancyPage() {
       fetch(`/api/rooms?propertyId=${propertyId}`).then((res) => res.json()),
   });
 
-  // Bookings for occupancy
   const { data: bookings = [] } = useQuery<Booking[]>({
     queryKey: ["occupancies", propertyId, selectedDate],
     enabled: !!propertyId,
@@ -54,14 +53,14 @@ export default function RoomOccupancyPage() {
       ),
   });
 
-  // **Unassigned guests: all properties**
   const { data: unassigned = [] } = useQuery<Booking[]>({
     queryKey: ["unassignedBookings"],
     queryFn: () =>
       fetch(`/api/bookings?unassigned=true`).then((res) => res.json()),
   });
 
-  // Mutations
+  /* ================= MUTATION ================= */
+
   const bookingMutation = useMutation({
     mutationFn: (payload: any) =>
       fetch("/api/bookings", {
@@ -75,31 +74,31 @@ export default function RoomOccupancyPage() {
     },
   });
 
-  // Filter bookings for a room
+  /* ================= HELPERS ================= */
+
   const bookingsForRoomOnDate = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
 
-  // Determine if room is available for assignment
   const isRoomAvailable = (roomId: string) => {
     const roomBookings = bookingsForRoomOnDate(roomId);
-
     if (roomBookings.length === 0) return true;
 
-    // Room is available if all bookings for today are checkouts
     return roomBookings.every(
       (b) =>
         b.type === "checkout" && b.checkOutDate.slice(0, 10) === selectedDate
     );
   };
 
-  return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
+  /* ================= UI ================= */
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 mb-6">
+  return (
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
+
+      {/* ================= FILTERS ================= */}
+      <div className="bg-white rounded-xl shadow p-4 mb-6 flex flex-col sm:flex-row gap-3">
         <select
-          className="border rounded px-4 py-2 shadow"
+          className="border rounded px-3 py-2 w-full sm:w-64"
           value={propertyId}
           onChange={(e) => setPropertyId(e.target.value)}
         >
@@ -115,14 +114,14 @@ export default function RoomOccupancyPage() {
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="border rounded px-4 py-2 shadow"
+          className="border rounded px-3 py-2 w-full sm:w-auto"
         />
       </div>
 
-      {roomsLoading && <p>Loading rooms...</p>}
+      {roomsLoading && <p className="text-gray-500">Loading rooms...</p>}
 
-      {/* Rooms Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* ================= ROOMS GRID ================= */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {rooms.map((room) => {
           const roomBookings = bookingsForRoomOnDate(room._id);
           const isAvailable = isRoomAvailable(room._id);
@@ -130,12 +129,13 @@ export default function RoomOccupancyPage() {
           return (
             <div
               key={room._id}
-              className={`rounded-xl shadow-md p-5 ${
+              className={`rounded-xl shadow-md p-4 ${
                 isAvailable ? "bg-green-50" : "bg-red-50"
               }`}
             >
-              <div className="flex justify-between mb-4">
-                <h2 className="text-xl font-semibold">Room {room.roomNo}</h2>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Room {room.roomNo}</h2>
                 <span
                   className={`text-xs px-3 py-1 rounded-full font-medium ${
                     isAvailable
@@ -148,65 +148,66 @@ export default function RoomOccupancyPage() {
               </div>
 
               {/* Guest Cards */}
-              {roomBookings.map((b) => (
-                <div
-                  key={b._id}
-                  className="mb-4 p-4 rounded-lg bg-white shadow hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="font-semibold text-lg">👤 {b.guestName}</p>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        b.status === "checked_out"
-                          ? "bg-gray-200 text-gray-800"
-                          : b.type === "checkin"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {b.status.replace("_", " ")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    📅 {b.checkInDate.slice(0, 10)} →{" "}
-                    {b.checkOutDate.slice(0, 10)}
-                  </p>
-
-                  <div className="flex gap-2">
-                    {b.type === "checkin" && b.status === "booked" && (
-                      <button
-                        onClick={() =>
-                          bookingMutation.mutate({
-                            bookingId: b._id,
-                            action: "checkin",
-                          })
-                        }
-                        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+              <div className="space-y-3">
+                {roomBookings.map((b) => (
+                  <div key={b._id} className="p-3 rounded-lg bg-white shadow">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="font-semibold">👤 {b.guestName}</p>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          b.status === "checked_out"
+                            ? "bg-gray-200 text-gray-700"
+                            : b.type === "checkin"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
                       >
-                        Check-in
-                      </button>
-                    )}
-                    {b.type === "checkout" && b.status !== "checked_out" && (
-                      <button
-                        onClick={() =>
-                          bookingMutation.mutate({
-                            bookingId: b._id,
-                            action: "checkout",
-                          })
-                        }
-                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors"
-                      >
-                        Check-out
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                        {b.status.replace("_", " ")}
+                      </span>
+                    </div>
 
-              {/* Unassigned Guests */}
+                    <p className="text-xs text-gray-600 mb-2">
+                      📅 {b.checkInDate.slice(0, 10)} →{" "}
+                      {b.checkOutDate.slice(0, 10)}
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {b.type === "checkin" && b.status === "booked" && (
+                        <button
+                          onClick={() =>
+                            bookingMutation.mutate({
+                              bookingId: b._id,
+                              action: "checkin",
+                            })
+                          }
+                          className="bg-blue-500 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
+                        >
+                          Check-in
+                        </button>
+                      )}
+
+                      {b.type === "checkout" && b.status !== "checked_out" && (
+                        <button
+                          onClick={() =>
+                            bookingMutation.mutate({
+                              bookingId: b._id,
+                              action: "checkout",
+                            })
+                          }
+                          className="bg-red-600 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
+                        >
+                          Check-out
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Assign Guest */}
               {isAvailable && (
                 <select
-                  className="border rounded w-full mt-3 p-2"
+                  className="border rounded w-full mt-4 p-2"
                   onChange={(e) =>
                     bookingMutation.mutate({
                       action: "assign",

@@ -33,8 +33,6 @@ const fetchJSON = (url: string) => fetch(url).then((r) => r.json());
 /* ================= PAGE ================= */
 
 export default function DailyIncomePage() {
-  /* ---------- Filters ---------- */
-
   const [type, setType] = useState<"daily" | "monthly" | "range">("daily");
   const [date, setDate] = useState("");
   const [month, setMonth] = useState("");
@@ -65,11 +63,11 @@ export default function DailyIncomePage() {
   /* ================= UI ================= */
 
   return (
-    <div className="p-8 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-6">💰 Income Report</h1>
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">💰 Income Report</h1>
 
       {/* ================= FILTERS ================= */}
-      <div className="bg-white rounded-xl shadow p-6 mb-8 grid md:grid-cols-6 gap-4">
+      <div className="bg-white rounded-xl shadow p-4 sm:p-6 mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <select
           className="border rounded p-2"
           value={type}
@@ -136,13 +134,12 @@ export default function DailyIncomePage() {
         </select>
       </div>
 
-      {/* ================= LOADING ================= */}
       {isLoading && <p className="text-gray-500">Loading income report...</p>}
 
       {/* ================= TOTAL CARDS ================= */}
       {data && (
         <>
-          <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <IncomeCard title="Booking.com" value={data.totals.booking} />
             <IncomeCard title="Agoda" value={data.totals.agoda} />
             <IncomeCard title="Airbnb" value={data.totals.airbnb} />
@@ -156,8 +153,25 @@ export default function DailyIncomePage() {
             />
           </div>
 
-          {/* ================= TABLE ================= */}
-          <div className="bg-white rounded-xl shadow overflow-hidden">
+          {/* ================= MOBILE CARDS ================= */}
+          <div className="space-y-3 sm:hidden">
+            {data.records.map((r) => (
+              <div key={r._id} className="bg-white rounded-xl shadow p-4">
+                <p className="font-semibold">{r.guestName}</p>
+                <p className="text-sm text-gray-600">{r.propertyId?.name}</p>
+                <div className="flex justify-between mt-2 text-sm">
+                  <Badge text={r.platform} />
+                  <span>{r.amount}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {r.paymentMethod} • {r.paymentDate?.slice(0, 10)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* ================= DESKTOP TABLE ================= */}
+          <div className="hidden sm:block bg-white rounded-xl shadow overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-100">
                 <tr>
@@ -193,15 +207,7 @@ export default function DailyIncomePage() {
 
 /* ================= COMPONENTS ================= */
 
-function IncomeCard({
-  title,
-  value,
-  highlight,
-}: {
-  title: string;
-  value: number;
-  highlight?: boolean;
-}) {
+function IncomeCard({ title, value, highlight }: any) {
   return (
     <div
       className={`rounded-xl p-4 shadow ${

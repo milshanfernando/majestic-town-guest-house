@@ -26,25 +26,48 @@ export default function PropertiesPage() {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">Properties</h1>
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6">🏢 Properties</h1>
 
-      <input
-        className="border p-2 mr-2"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Property name"
-      />
+      {/* Add Property Card */}
+      <div className="bg-white rounded-xl shadow p-4 sm:p-6 mb-8 max-w-xl">
+        <h2 className="text-lg font-semibold mb-4">➕ Add Property</h2>
 
-      <button className="bg-black text-white px-4 py-2" onClick={addProperty}>
-        Add
-      </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            className="border rounded-lg p-3 w-full focus:outline-none focus:ring-2 focus:ring-black"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Property name"
+          />
 
-      <ul className="mt-4">
-        {properties.map((p) => (
-          <li key={p._id}>{p.name}</li>
-        ))}
-      </ul>
+          <button
+            className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition w-full sm:w-auto"
+            onClick={addProperty}
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Property List */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">📋 Property List</h2>
+
+        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {properties.map((p, index) => (
+            <li
+              key={p._id}
+              className="bg-white rounded-xl shadow p-4 hover:shadow-lg transition"
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-lg">🏨 {p.name}</span>
+                <span className="text-xs text-gray-400">#{index + 1}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
