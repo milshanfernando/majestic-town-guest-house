@@ -23,9 +23,11 @@ export async function GET(req: Request) {
       const bookings = await Booking.find({
         roomId: { $exists: false },
         status: { $ne: "cancel" },
-      }).sort({
-        checkInDate: 1,
-      });
+      })
+        .populate("propertyId")
+        .sort({
+          checkInDate: 1,
+        });
       return NextResponse.json(bookings);
     }
 
