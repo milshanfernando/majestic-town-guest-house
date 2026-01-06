@@ -29,7 +29,11 @@ interface Booking {
 
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
+
+  const today = new Date().toISOString().slice(0, 10);
+
   const [propertyId, setPropertyId] = useState("");
+  const [selectedDate, setSelectedDate] = useState(today);
 
   /* ---------------- Properties ---------------- */
 
@@ -47,19 +51,26 @@ export default function RoomOccupancyPage() {
       fetch(`/api/rooms?propertyId=${propertyId}`).then((res) => res.json()),
   });
 
-  /* ---------------- Active Bookings ---------------- */
+  /* ---------------- Occupied Rooms (by date) ---------------- */
 
   const { data: bookings = [] } = useQuery<Booking[]>({
-    queryKey: ["activeBookings"],
-    queryFn: () => fetch(`/api/bookings?active=true`).then((res) => res.json()),
+    queryKey: ["occupancies", propertyId, selectedDate],
+    enabled: !!propertyId,
+    queryFn: () =>
+      fetch(`/api/bookings?propertyId=${propertyId}&date=${selectedDate}`).then(
+        (res) => res.json()
+      ),
   });
 
   /* ---------------- Unassigned Bookings ---------------- */
 
   const { data: unassigned = [] } = useQuery<Booking[]>({
-    queryKey: ["unassignedBookings"],
+    queryKey: ["unassignedBookings", propertyId],
+    enabled: !!propertyId,
     queryFn: () =>
-      fetch(`/api/bookings?unassigned=true`).then((res) => res.json()),
+      fetch(`/api/bookings?unassigned=true&propertyId=${propertyId}`).then(
+        (res) => res.json()
+      ),
   });
 
   /* ===================== MUTATIONS ===================== */
@@ -72,8 +83,8 @@ export default function RoomOccupancyPage() {
         body: JSON.stringify(payload),
       }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["occupancies"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBookings"] });
       queryClient.invalidateQueries({ queryKey: ["unassignedBookings"] });
     },
   });
@@ -89,21 +100,32 @@ export default function RoomOccupancyPage() {
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
 
-      <select
-        className="border rounded px-4 py-2 mb-6 shadow"
-        value={propertyId}
-        onChange={(e) => setPropertyId(e.target.value)}
-      >
-        <option value="">Select Property</option>
-        {properties.map((p) => (
-          <option key={p._id} value={p._id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      {/* ---------------- Filters ---------------- */}
+      <div className="flex flex-wrap gap-4 mb-6">
+        <select
+          className="border rounded px-4 py-2 shadow"
+          value={propertyId}
+          onChange={(e) => setPropertyId(e.target.value)}
+        >
+          <option value="">Select Property</option>
+          {properties.map((p) => (
+            <option key={p._id} value={p._id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="border rounded px-4 py-2 shadow"
+        />
+      </div>
 
       {roomsLoading && <p>Loading rooms...</p>}
 
+      {/* ---------------- Rooms Grid ---------------- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {rooms.map((room) => {
           const booking = bookingForRoom(room._id);
@@ -139,10 +161,6 @@ export default function RoomOccupancyPage() {
                       .toISOString()
                       .slice(0, 10)}
                   </p>
-
-                  {booking.propertyId && (
-                    <p className="text-xs mt-1">🏠 {booking.propertyId.name}</p>
-                  )}
 
                   <div className="flex gap-2 mt-4">
                     <button
@@ -185,7 +203,6 @@ export default function RoomOccupancyPage() {
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
                       {b.guestName}
-                      {b.propertyId ? ` (${b.propertyId.name})` : ""}
                     </option>
                   ))}
                 </select>

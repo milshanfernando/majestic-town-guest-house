@@ -27,7 +27,7 @@ export async function GET(req: Request) {
       const selected = new Date(date);
 
       query.checkInDate = { $lte: selected };
-      query.checkOutDate = { $gt: selected };
+      query.checkOutDate = { $gte: selected };
       query.status = { $ne: "cancel" };
     }
 
