@@ -41,7 +41,10 @@ export default function DailyIncomePage() {
   const [propertyId, setPropertyId] = useState("");
   const [platform, setPlatform] = useState("");
 
-  /* ---------- Queries ---------- */
+  const inputClass =
+    "border rounded p-2 h-10 bg-white text-gray-900 w-full appearance-none";
+
+  /* ================= QUERIES ================= */
 
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["properties"],
@@ -63,13 +66,13 @@ export default function DailyIncomePage() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-100 p-1 sm:p-6 lg:p-8">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">💰 Income Report</h1>
 
       {/* ================= FILTERS ================= */}
       <div className="bg-white rounded-xl shadow p-4 sm:p-6 mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <select
-          className="border rounded p-2"
+          className={inputClass}
           value={type}
           onChange={(e) => setType(e.target.value as any)}
         >
@@ -81,7 +84,8 @@ export default function DailyIncomePage() {
         {type === "daily" && (
           <input
             type="date"
-            className="border rounded p-2"
+            className={inputClass}
+            value={date}
             onChange={(e) => setDate(e.target.value)}
           />
         )}
@@ -89,7 +93,8 @@ export default function DailyIncomePage() {
         {type === "monthly" && (
           <input
             type="month"
-            className="border rounded p-2"
+            className={inputClass}
+            value={month}
             onChange={(e) => setMonth(e.target.value)}
           />
         )}
@@ -98,19 +103,22 @@ export default function DailyIncomePage() {
           <>
             <input
               type="date"
-              className="border rounded p-2"
+              className={inputClass}
+              value={from}
               onChange={(e) => setFrom(e.target.value)}
             />
             <input
               type="date"
-              className="border rounded p-2"
+              className={inputClass}
+              value={to}
               onChange={(e) => setTo(e.target.value)}
             />
           </>
         )}
 
         <select
-          className="border rounded p-2"
+          className={inputClass}
+          value={propertyId}
           onChange={(e) => setPropertyId(e.target.value)}
         >
           <option value="">All Properties</option>
@@ -122,7 +130,8 @@ export default function DailyIncomePage() {
         </select>
 
         <select
-          className="border rounded p-2"
+          className={inputClass}
+          value={platform}
           onChange={(e) => setPlatform(e.target.value)}
         >
           <option value="">All Platforms</option>
@@ -153,7 +162,7 @@ export default function DailyIncomePage() {
             />
           </div>
 
-          {/* ================= MOBILE CARDS ================= */}
+          {/* ================= MOBILE ================= */}
           <div className="space-y-3 sm:hidden">
             {data.records.map((r) => (
               <div key={r._id} className="bg-white rounded-xl shadow p-4">
@@ -207,7 +216,15 @@ export default function DailyIncomePage() {
 
 /* ================= COMPONENTS ================= */
 
-function IncomeCard({ title, value, highlight }: any) {
+function IncomeCard({
+  title,
+  value,
+  highlight,
+}: {
+  title: string;
+  value: number;
+  highlight?: boolean;
+}) {
   return (
     <div
       className={`rounded-xl p-4 shadow ${

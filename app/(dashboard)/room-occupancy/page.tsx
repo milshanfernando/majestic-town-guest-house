@@ -4,14 +4,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+/* ================= TYPES ================= */
+
 interface Property {
   _id: string;
   name: string;
 }
+
 interface Room {
   _id: string;
   roomNo: string;
 }
+
 interface Booking {
   _id: string;
   guestName: string;
@@ -23,12 +27,18 @@ interface Booking {
   type?: "checkin" | "checkout" | "stay";
 }
 
+/* ================= PAGE ================= */
+
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
+
   const today = new Date().toISOString().slice(0, 10);
 
   const [propertyId, setPropertyId] = useState("");
   const [selectedDate, setSelectedDate] = useState(today);
+
+  const inputClass =
+    "border rounded p-2 h-10 bg-white text-gray-900 w-full appearance-none";
 
   /* ================= QUERIES ================= */
 
@@ -92,13 +102,13 @@ export default function RoomOccupancyPage() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-100 p-1 sm:p-6 lg:p-8">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">🏨 Room Occupancy</h1>
 
       {/* ================= FILTERS ================= */}
       <div className="bg-white rounded-xl shadow p-4 mb-6 flex flex-col sm:flex-row gap-3">
         <select
-          className="border rounded px-3 py-2 w-full sm:w-64"
+          className={`${inputClass} sm:w-64`}
           value={propertyId}
           onChange={(e) => setPropertyId(e.target.value)}
         >
@@ -112,9 +122,9 @@ export default function RoomOccupancyPage() {
 
         <input
           type="date"
+          className={`${inputClass} sm:w-auto`}
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="border rounded px-3 py-2 w-full sm:w-auto"
         />
       </div>
 
@@ -207,7 +217,7 @@ export default function RoomOccupancyPage() {
               {/* Assign Guest */}
               {isAvailable && (
                 <select
-                  className="border rounded w-full mt-4 p-2"
+                  className={`${inputClass} mt-4`}
                   onChange={(e) =>
                     bookingMutation.mutate({
                       action: "assign",

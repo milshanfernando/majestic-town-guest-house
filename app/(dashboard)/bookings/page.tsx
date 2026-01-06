@@ -15,13 +15,14 @@ interface BookingForm {
   guestName: string;
   phone: string;
   email: string;
+  reservationId: string;
   propertyId: string;
   platform: string;
   paymentMethod: string;
   amount: number | "";
-  paymentDate: string;
-  checkInDate: string;
-  checkOutDate: string;
+  paymentDate: string | "";
+  checkInDate: string | "";
+  checkOutDate: string | "";
   status: string;
 }
 
@@ -39,11 +40,12 @@ export default function BookingPage() {
     guestName: "",
     phone: "",
     email: "",
+    reservationId: "",
     propertyId: "",
     platform: "Booking.com",
     paymentMethod: "online",
     amount: "",
-    paymentDate: today,
+    paymentDate: "",
     checkInDate: "",
     checkOutDate: "",
     status: "booked",
@@ -64,23 +66,33 @@ export default function BookingPage() {
   /* ================= MUTATION ================= */
 
   const saveBooking = useMutation({
-    mutationFn: () =>
-      fetch("/api/bookings", {
+    mutationFn: async () => {
+      const res = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      }),
+        body: JSON.stringify({
+          ...form,
+          amount: Number(form.amount),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to save booking");
+      }
+      return res.json();
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["occupancies"] });
       setForm({
         guestName: "",
         phone: "",
         email: "",
+        reservationId: "",
         propertyId: "",
         platform: "Booking.com",
         paymentMethod: "online",
         amount: "",
-        paymentDate: today,
+        paymentDate: "",
         checkInDate: "",
         checkOutDate: "",
         status: "booked",
@@ -99,13 +111,13 @@ export default function BookingPage() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-100 p-1 sm:p-6 lg:p-8">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6">
         🏨 Booking Management
       </h1>
 
       {/* ================= NEW BOOKING ================= */}
-      <div className="bg-white rounded-xl shadow p-4 sm:p-6 mb-10 max-w-3xl">
+      <div className="bg-white rounded-xl shadow p-2 sm:p-6 mb-10 max-w-3xl">
         <h2 className="text-lg sm:text-xl font-semibold mb-4">
           📝 New Booking
         </h2>
@@ -120,6 +132,14 @@ export default function BookingPage() {
           />
 
           <input
+            name="reservationId"
+            placeholder="Reservation ID"
+            className="border p-2 rounded w-full"
+            value={form.reservationId}
+            onChange={handleChange}
+          />
+
+          <input
             name="phone"
             placeholder="Phone"
             className="border p-2 rounded w-full"
@@ -130,14 +150,14 @@ export default function BookingPage() {
           <input
             name="email"
             placeholder="Email"
-            className="border p-2 rounded w-full sm:col-span-2"
+            className="border p-2 rounded w-full"
             value={form.email}
             onChange={handleChange}
           />
 
           <select
             name="propertyId"
-            className="border p-2 rounded w-full sm:col-span-2"
+            className="border p-2 rounded w-full sm:col-span-2 bg-white"
             value={form.propertyId}
             onChange={handleChange}
           >
@@ -151,7 +171,7 @@ export default function BookingPage() {
 
           <select
             name="platform"
-            className="border p-2 rounded w-full"
+            className="border p-2 rounded w-full bg-white"
             value={form.platform}
             onChange={handleChange}
           >
@@ -164,7 +184,7 @@ export default function BookingPage() {
 
           <select
             name="paymentMethod"
-            className="border p-2 rounded w-full"
+            className="border p-2 rounded w-full bg-white"
             value={form.paymentMethod}
             onChange={handleChange}
           >
@@ -185,7 +205,7 @@ export default function BookingPage() {
           <input
             name="paymentDate"
             type="date"
-            className="border p-2 rounded w-full"
+            className="border p-2 rounded w-full bg-white"
             value={form.paymentDate}
             onChange={handleChange}
           />
@@ -193,7 +213,7 @@ export default function BookingPage() {
           <input
             name="checkInDate"
             type="date"
-            className="border p-2 rounded w-full"
+            className="border p-2 rounded w-full bg-white"
             value={form.checkInDate}
             onChange={handleChange}
           />
@@ -201,7 +221,7 @@ export default function BookingPage() {
           <input
             name="checkOutDate"
             type="date"
-            className="border p-2 rounded w-full sm:col-span-2"
+            className="border p-2 rounded w-full sm:col-span-2 bg-white"
             value={form.checkOutDate}
             onChange={handleChange}
           />
@@ -209,9 +229,10 @@ export default function BookingPage() {
 
         <button
           onClick={() => saveBooking.mutate()}
-          className="mt-5 bg-black hover:bg-gray-800 text-white px-6 py-3 rounded w-full"
+          className="mt-5 bg-black hover:bg-gray-800 text-white px-6 py-3 rounded w-full disabled:opacity-50"
+          disabled={saveBooking.isPending}
         >
-          Save Booking
+          {saveBooking.isPending ? "Saving..." : "Save Booking"}
         </button>
       </div>
 
@@ -222,7 +243,7 @@ export default function BookingPage() {
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="border p-2 rounded w-full sm:w-auto"
+          className="border p-2 rounded w-full sm:w-auto bg-white"
         />
       </div>
 
