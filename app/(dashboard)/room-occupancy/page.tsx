@@ -19,7 +19,7 @@ interface Room {
 interface Booking {
   _id: string;
   guestName: string;
-  roomId?: { _id: string };
+  roomId?: string;
   propertyId?: { _id: string; name: string };
   checkInDate: string;
   checkOutDate: string;
@@ -92,7 +92,7 @@ export default function RoomOccupancyPage() {
   /* ===================== HELPERS ===================== */
 
   const bookingForRoom = (roomId: string) =>
-    bookings.find((b) => b.roomId?._id === roomId);
+    bookings.find((b) => b.roomId === roomId);
 
   /* ===================== UI ===================== */
 
