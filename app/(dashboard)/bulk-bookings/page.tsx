@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /* ================= TYPES ================= */
@@ -40,27 +40,38 @@ export default function BulkBookingPage() {
     queryFn: () => fetchJSON("/api/properties"),
   });
 
-  /* ================= CSV UPLOAD ================= */
+  /* ================= EXCEL UPLOAD ================= */
 
-  const handleCSVUpload = (file: File) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (result) => {
-        const parsed: ImportedBooking[] = (result.data as any[]).map((r) => ({
-          reservationId: String(r.bookNumber || ""),
-          guestName: r.guestName || r.bookedBy || "Unknown",
-          checkInDate: r.checkInDate,
-          checkOutDate: r.checkOutDate,
-          unitType: r.unitType,
-          propertyId: "",
-          paymentMethod: "online",
-          status: "pending",
-        }));
+  const handleExcelUpload = (file: File) => {
+    const reader = new FileReader();
 
-        setRows(parsed);
-      },
-    });
+    reader.onload = (e) => {
+      const data = e.target?.result;
+      if (!data) return;
+
+      const workbook = XLSX.read(data, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+
+      const json = XLSX.utils.sheet_to_json<any>(sheet);
+
+      const parsed: ImportedBooking[] = json.map((r) => ({
+        reservationId: String(
+          r.bookNumber || r.reservationId || r["Reservation number"] || ""
+        ),
+        guestName: r.guestName || r.bookedBy || r["Booked by"] || "Unknown",
+        checkInDate: r.checkInDate || r["Check-in"] || r["Check in"] || "",
+        checkOutDate: r.checkOutDate || r["Check-out"] || r["Check out"] || "",
+        unitType: r.unitType || r.roomType || r["Unit type"] || "",
+        propertyId: "",
+        paymentMethod: "online",
+        status: "pending",
+      }));
+
+      setRows(parsed);
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   /* ================= SAVE MUTATION ================= */
@@ -108,14 +119,16 @@ export default function BulkBookingPage() {
 
         <input
           type="file"
-          accept=".csv"
-          onChange={(e) => e.target.files && handleCSVUpload(e.target.files[0])}
+          accept=".xls,.xlsx"
+          onChange={(e) =>
+            e.target.files && handleExcelUpload(e.target.files[0])
+          }
           className="mb-4"
         />
 
         {rows.length === 0 && (
           <p className="text-gray-500 text-sm">
-            Upload a Booking.com CSV file to preview reservations
+            Upload a Booking.com Excel (.xls / .xlsx) file
           </p>
         )}
 
