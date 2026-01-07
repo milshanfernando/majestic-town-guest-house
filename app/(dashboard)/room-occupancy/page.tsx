@@ -224,24 +224,20 @@ export default function RoomOccupancyPage() {
                 <select
                   className={`${inputClass} mt-4`}
                   onChange={(e) => {
-                    const bookingId = e.target.value;
+                    const value = e.target.value;
 
-                    if (!bookingId) {
-                      // Unassign first guest in this room
-                      const currentBooking = roomBookings[0];
-                      if (currentBooking) {
-                        bookingMutation.mutate({
-                          action: "assign",
-                          roomId: "",
-                          bookingId: currentBooking._id,
-                        });
-                      }
-                    } else {
-                      // Assign selected guest
+                    if (value.startsWith("remove-")) {
+                      const bookingId = value.replace("remove-", "");
+                      bookingMutation.mutate({
+                        action: "assign",
+                        roomId: "", // unassign
+                        bookingId,
+                      });
+                    } else if (value) {
                       bookingMutation.mutate({
                         action: "assign",
                         roomId: room._id,
-                        bookingId,
+                        bookingId: value,
                       });
                     }
                   }}
@@ -258,8 +254,9 @@ export default function RoomOccupancyPage() {
 
                   {/* Remove current room guests */}
                   {roomBookings.map((b) => (
-                    <option key={`remove-${b._id}`} value="">
-                      Remove {b.guestName}
+                    <option key={`remove-${b._id}`} value={`remove-${b._id}`}>
+                      Remove {b.guestName} ({formatDate(b.checkInDate)} →{" "}
+                      {formatDate(b.checkOutDate)})
                     </option>
                   ))}
                 </select>
