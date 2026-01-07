@@ -99,6 +99,11 @@ export default function RoomOccupancyPage() {
     );
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
   /* ================= UI ================= */
 
   return (
@@ -177,8 +182,8 @@ export default function RoomOccupancyPage() {
                     </div>
 
                     <p className="text-xs text-gray-600 mb-2">
-                      📅 {b.checkInDate.slice(0, 10)} →{" "}
-                      {b.checkOutDate.slice(0, 10)}
+                      📅 {formatDate(b.checkInDate)} →{" "}
+                      {formatDate(b.checkOutDate)}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -214,22 +219,47 @@ export default function RoomOccupancyPage() {
                 ))}
               </div>
 
-              {/* Assign Guest */}
+              {/* Assign / Remove Guest */}
               {isAvailable && (
                 <select
                   className={`${inputClass} mt-4`}
-                  onChange={(e) =>
-                    bookingMutation.mutate({
-                      action: "assign",
-                      roomId: room._id,
-                      bookingId: e.target.value,
-                    })
-                  }
+                  onChange={(e) => {
+                    const bookingId = e.target.value;
+
+                    if (!bookingId) {
+                      // Unassign first guest in this room
+                      const currentBooking = roomBookings[0];
+                      if (currentBooking) {
+                        bookingMutation.mutate({
+                          action: "assign",
+                          roomId: "",
+                          bookingId: currentBooking._id,
+                        });
+                      }
+                    } else {
+                      // Assign selected guest
+                      bookingMutation.mutate({
+                        action: "assign",
+                        roomId: room._id,
+                        bookingId,
+                      });
+                    }
+                  }}
                 >
-                  <option value="">Assign Guest</option>
+                  <option value="">Assign / Remove Guest</option>
+
+                  {/* Unassigned Guests */}
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
-                      {b.guestName} ({b.propertyId?.name || "No Property"})
+                      {b.guestName} ({formatDate(b.checkInDate)} →{" "}
+                      {formatDate(b.checkOutDate)})
+                    </option>
+                  ))}
+
+                  {/* Remove current room guests */}
+                  {roomBookings.map((b) => (
+                    <option key={`remove-${b._id}`} value="">
+                      Remove {b.guestName}
                     </option>
                   ))}
                 </select>
