@@ -6,6 +6,7 @@ export interface IBooking {
   phone: string;
   idNumber: string;
   reservationId?: string;
+  unitType?: string;
 
   propertyId: mongoose.Types.ObjectId;
   roomId?: mongoose.Types.ObjectId;
