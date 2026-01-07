@@ -31,7 +31,6 @@ interface Booking {
 
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
-
   const today = new Date().toISOString().slice(0, 10);
 
   const [propertyId, setPropertyId] = useState("");
@@ -86,23 +85,17 @@ export default function RoomOccupancyPage() {
 
   /* ================= HELPERS ================= */
 
-  const bookingsForRoomOnDate = (roomId: string) =>
+  const bookingsForRoom = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
 
-  const isRoomAvailable = (roomId: string) => {
-    const roomBookings = bookingsForRoomOnDate(roomId);
-    if (roomBookings.length === 0) return true;
+  const isRoomAvailable = (roomId: string) =>
+    bookingsForRoom(roomId).length === 0;
 
-    return roomBookings.every(
-      (b) =>
-        b.type === "checkout" && b.checkOutDate.slice(0, 10) === selectedDate
-    );
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
 
   /* ================= UI ================= */
 
@@ -138,14 +131,14 @@ export default function RoomOccupancyPage() {
       {/* ================= ROOMS GRID ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {rooms.map((room) => {
-          const roomBookings = bookingsForRoomOnDate(room._id);
-          const isAvailable = isRoomAvailable(room._id);
+          const roomBookings = bookingsForRoom(room._id);
+          const available = isRoomAvailable(room._id);
 
           return (
             <div
               key={room._id}
               className={`rounded-xl shadow-md p-4 ${
-                isAvailable ? "bg-green-50" : "bg-red-50"
+                available ? "bg-green-50" : "bg-red-50"
               }`}
             >
               {/* Header */}
@@ -153,12 +146,12 @@ export default function RoomOccupancyPage() {
                 <h2 className="text-lg font-semibold">Room {room.roomNo}</h2>
                 <span
                   className={`text-xs px-3 py-1 rounded-full font-medium ${
-                    isAvailable
+                    available
                       ? "bg-green-200 text-green-800"
                       : "bg-red-200 text-red-800"
                   }`}
                 >
-                  {isAvailable ? "Available" : "Occupied"}
+                  {available ? "Available" : "Occupied"}
                 </span>
               </div>
 
@@ -172,9 +165,7 @@ export default function RoomOccupancyPage() {
                         className={`text-xs px-2 py-1 rounded-full ${
                           b.status === "checked_out"
                             ? "bg-gray-200 text-gray-700"
-                            : b.type === "checkin"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-yellow-100 text-yellow-800"
+                            : "bg-blue-100 text-blue-800"
                         }`}
                       >
                         {b.status.replace("_", " ")}
@@ -186,76 +177,40 @@ export default function RoomOccupancyPage() {
                       {formatDate(b.checkOutDate)}
                     </p>
 
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      {b.type === "checkin" && b.status === "booked" && (
-                        <button
-                          onClick={() =>
-                            bookingMutation.mutate({
-                              bookingId: b._id,
-                              action: "checkin",
-                            })
-                          }
-                          className="bg-blue-500 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
-                        >
-                          Check-in
-                        </button>
-                      )}
-
-                      {b.type === "checkout" && b.status !== "checked_out" && (
-                        <button
-                          onClick={() =>
-                            bookingMutation.mutate({
-                              bookingId: b._id,
-                              action: "checkout",
-                            })
-                          }
-                          className="bg-red-600 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
-                        >
-                          Check-out
-                        </button>
-                      )}
-                    </div>
+                    {/* Remove Guest Button */}
+                    <button
+                      onClick={() =>
+                        bookingMutation.mutate({
+                          bookingId: b._id,
+                          roomId: "", // unassign guest
+                        })
+                      }
+                      className="bg-red-600 text-white px-3 py-2 rounded text-sm w-full"
+                    >
+                      Remove Guest
+                    </button>
                   </div>
                 ))}
               </div>
 
-              {/* Assign / Remove Guest */}
-              {isAvailable && (
+              {/* Assign Guest */}
+              {available && (
                 <select
                   className={`${inputClass} mt-4`}
                   onChange={(e) => {
-                    const value = e.target.value;
-
-                    if (value.startsWith("remove-")) {
-                      const bookingId = value.replace("remove-", "");
+                    const bookingId = e.target.value;
+                    if (bookingId) {
                       bookingMutation.mutate({
-                        action: "assign",
-                        roomId: "", // unassign
                         bookingId,
-                      });
-                    } else if (value) {
-                      bookingMutation.mutate({
-                        action: "assign",
                         roomId: room._id,
-                        bookingId: value,
                       });
                     }
                   }}
                 >
-                  <option value="">Assign / Remove Guest</option>
-
-                  {/* Unassigned Guests */}
+                  <option value="">Assign Guest</option>
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
                       {b.guestName} ({formatDate(b.checkInDate)} →{" "}
-                      {formatDate(b.checkOutDate)})
-                    </option>
-                  ))}
-
-                  {/* Remove current room guests */}
-                  {roomBookings.map((b) => (
-                    <option key={`remove-${b._id}`} value={`remove-${b._id}`}>
-                      Remove {b.guestName} ({formatDate(b.checkInDate)} →{" "}
                       {formatDate(b.checkOutDate)})
                     </option>
                   ))}
