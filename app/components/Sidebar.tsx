@@ -6,6 +6,7 @@ import { ClipboardList, Bed, Home, Wallet, X } from "lucide-react";
 
 const menu = [
   { name: "Bookings", href: "/bookings", icon: ClipboardList },
+  { name: "Bulk Bookings", href: "/bulk-bookings", icon: ClipboardList },
   { name: "Rooms", href: "/rooms", icon: Bed },
   { name: "Room Occupancy", href: "/room-occupancy", icon: Home },
   { name: "Daily Income", href: "/incomes", icon: Wallet },
