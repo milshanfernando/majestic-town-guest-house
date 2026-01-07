@@ -31,6 +31,7 @@ interface Booking {
 
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
+
   const today = new Date().toISOString().slice(0, 10);
 
   const [propertyId, setPropertyId] = useState("");
@@ -85,17 +86,18 @@ export default function RoomOccupancyPage() {
 
   /* ================= HELPERS ================= */
 
-  const bookingsForRoom = (roomId: string) =>
+  const bookingsForRoomOnDate = (roomId: string) =>
     bookings.filter((b) => b.roomId === roomId);
 
-  const isRoomAvailable = (roomId: string) =>
-    bookingsForRoom(roomId).length === 0;
+  const isRoomAvailable = (roomId: string) => {
+    const roomBookings = bookingsForRoomOnDate(roomId);
+    if (roomBookings.length === 0) return true;
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return roomBookings.every(
+      (b) =>
+        b.type === "checkout" && b.checkOutDate.slice(0, 10) === selectedDate
+    );
+  };
 
   /* ================= UI ================= */
 
@@ -131,14 +133,14 @@ export default function RoomOccupancyPage() {
       {/* ================= ROOMS GRID ================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {rooms.map((room) => {
-          const roomBookings = bookingsForRoom(room._id);
-          const available = isRoomAvailable(room._id);
+          const roomBookings = bookingsForRoomOnDate(room._id);
+          const isAvailable = isRoomAvailable(room._id);
 
           return (
             <div
               key={room._id}
               className={`rounded-xl shadow-md p-4 ${
-                available ? "bg-green-50" : "bg-red-50"
+                isAvailable ? "bg-green-50" : "bg-red-50"
               }`}
             >
               {/* Header */}
@@ -146,12 +148,12 @@ export default function RoomOccupancyPage() {
                 <h2 className="text-lg font-semibold">Room {room.roomNo}</h2>
                 <span
                   className={`text-xs px-3 py-1 rounded-full font-medium ${
-                    available
+                    isAvailable
                       ? "bg-green-200 text-green-800"
                       : "bg-red-200 text-red-800"
                   }`}
                 >
-                  {available ? "Available" : "Occupied"}
+                  {isAvailable ? "Available" : "Occupied"}
                 </span>
               </div>
 
@@ -159,59 +161,89 @@ export default function RoomOccupancyPage() {
               <div className="space-y-3">
                 {roomBookings.map((b) => (
                   <div key={b._id} className="p-3 rounded-lg bg-white shadow">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="font-semibold">👤 {b.guestName}</p>
+                    <div className="flex justify-end mb-1">
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
                           b.status === "checked_out"
                             ? "bg-gray-200 text-gray-700"
-                            : "bg-blue-100 text-blue-800"
+                            : b.type === "checkin"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-yellow-100 text-yellow-800"
                         }`}
                       >
                         {b.status.replace("_", " ")}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="font-semibold">👤 {b.guestName}</p>
+                      <p
+                        onClick={() =>
+                          bookingMutation.mutate({
+                            bookingId: b._id,
+                            roomId: null,
+                            action: "assign",
+                          })
+                        }
+                        className=" text-red-900 hover:bg-red-100 px-2"
+                      >
+                        Remove
+                      </p>
+                    </div>
 
                     <p className="text-xs text-gray-600 mb-2">
-                      📅 {formatDate(b.checkInDate)} →{" "}
-                      {formatDate(b.checkOutDate)}
+                      📅 {b.checkInDate.slice(0, 10)} →{" "}
+                      {b.checkOutDate.slice(0, 10)}
                     </p>
 
-                    {/* Remove Guest Button */}
-                    <button
-                      onClick={() =>
-                        bookingMutation.mutate({
-                          bookingId: b._id,
-                          roomId: "", // unassign guest
-                        })
-                      }
-                      className="bg-red-600 text-white px-3 py-2 rounded text-sm w-full"
-                    >
-                      Remove Guest
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {b.type === "checkin" && b.status === "booked" && (
+                        <button
+                          onClick={() =>
+                            bookingMutation.mutate({
+                              bookingId: b._id,
+                              action: "checkin",
+                            })
+                          }
+                          className="bg-blue-500 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
+                        >
+                          Check-in
+                        </button>
+                      )}
+
+                      {b.type === "checkout" && b.status !== "checked_out" && (
+                        <button
+                          onClick={() =>
+                            bookingMutation.mutate({
+                              bookingId: b._id,
+                              action: "checkout",
+                            })
+                          }
+                          className="bg-red-600 text-white px-3 py-2 rounded text-sm w-full sm:w-auto"
+                        >
+                          Check-out
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* Assign Guest */}
-              {available && (
+              {isAvailable && (
                 <select
                   className={`${inputClass} mt-4`}
-                  onChange={(e) => {
-                    const bookingId = e.target.value;
-                    if (bookingId) {
-                      bookingMutation.mutate({
-                        bookingId,
-                        roomId: room._id,
-                      });
-                    }
-                  }}
+                  onChange={(e) =>
+                    bookingMutation.mutate({
+                      action: "assign",
+                      roomId: room._id,
+                      bookingId: e.target.value,
+                    })
+                  }
                 >
                   <option value="">Assign Guest</option>
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
-                      {b.guestName} ({formatDate(b.checkInDate)} →{" "}
-                      {formatDate(b.checkOutDate)})
+                      {b.guestName} ({b.propertyId?.name || "No Property"})
                     </option>
                   ))}
                 </select>
