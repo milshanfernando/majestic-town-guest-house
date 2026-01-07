@@ -31,7 +31,6 @@ interface Booking {
 
 export default function RoomOccupancyPage() {
   const queryClient = useQueryClient();
-
   const today = new Date().toISOString().slice(0, 10);
 
   const [propertyId, setPropertyId] = useState("");
@@ -99,6 +98,11 @@ export default function RoomOccupancyPage() {
     );
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
   /* ================= UI ================= */
 
   return (
@@ -161,7 +165,19 @@ export default function RoomOccupancyPage() {
               <div className="space-y-3">
                 {roomBookings.map((b) => (
                   <div key={b._id} className="p-3 rounded-lg bg-white shadow">
-                    <div className="flex justify-end mb-1">
+                    <div className="flex justify-between mb-1">
+                      <p
+                        onClick={() =>
+                          bookingMutation.mutate({
+                            bookingId: b._id,
+                            roomId: null,
+                            action: "assign",
+                          })
+                        }
+                        className=" text-red-900 hover:bg-red-100 px-2 cursor-pointer"
+                      >
+                        Remove
+                      </p>
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
                           b.status === "checked_out"
@@ -176,23 +192,11 @@ export default function RoomOccupancyPage() {
                     </div>
                     <div className="flex justify-between items-center mb-1">
                       <p className="font-semibold">👤 {b.guestName}</p>
-                      <p
-                        onClick={() =>
-                          bookingMutation.mutate({
-                            bookingId: b._id,
-                            roomId: null,
-                            action: "assign",
-                          })
-                        }
-                        className=" text-red-900 hover:bg-red-100 px-2"
-                      >
-                        Remove
-                      </p>
                     </div>
 
                     <p className="text-xs text-gray-600 mb-2">
-                      📅 {b.checkInDate.slice(0, 10)} →{" "}
-                      {b.checkOutDate.slice(0, 10)}
+                      📅 {formatDate(b.checkInDate)} →{" "}
+                      {formatDate(b.checkOutDate)}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -243,7 +247,8 @@ export default function RoomOccupancyPage() {
                   <option value="">Assign Guest</option>
                   {unassigned.map((b) => (
                     <option key={b._id} value={b._id}>
-                      {b.guestName} ({b.propertyId?.name || "No Property"})
+                      {b.guestName} ({b.propertyId?.name || "No Property"}) 📅{" "}
+                      {formatDate(b.checkInDate)} → {formatDate(b.checkOutDate)}
                     </option>
                   ))}
                 </select>
