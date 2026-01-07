@@ -13,8 +13,8 @@ interface Property {
 }
 
 interface ImportedBooking {
-  rowId: string; // 🔥 internal unique key
-  reservationId: string; // Booking.com → Book number
+  rowId: string;
+  reservationId: string;
   guestName: string;
   checkInDate: string;
   checkOutDate: string;
@@ -52,16 +52,15 @@ export default function BulkBookingPage() {
 
       const workbook = XLSX.read(data, { type: "binary" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
       const json = XLSX.utils.sheet_to_json<any>(sheet);
 
       const parsed: ImportedBooking[] = json.map((r) => ({
-        rowId: crypto.randomUUID(), // ✅ stable React key
+        rowId: crypto.randomUUID(),
         reservationId: String(r["Book number"] || ""),
         guestName: r["Guest name"] || r["Booked by"] || "Unknown",
-        checkInDate: r["Check-in"] || r["Check in"] || "",
-        checkOutDate: r["Check-out"] || r["Check out"] || "",
-        unitType: r["Unit type"] || r["Room type"] || "",
+        checkInDate: r["Check-in"] || "",
+        checkOutDate: r["Check-out"] || "",
+        unitType: r["Unit type"] || "",
         propertyId: "",
         paymentMethod: "online",
         status: "pending",
@@ -110,9 +109,8 @@ export default function BulkBookingPage() {
     <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
       <h1 className="text-2xl font-bold mb-6">📥 Bulk Booking Import</h1>
 
-      {/* ================= BOOKING.COM ================= */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h2 className="text-xl font-semibold mb-4">Booking.com</h2>
+      <div className="bg-white rounded-xl shadow p-4 mb-6">
+        <h2 className="text-xl font-semibold mb-3">Booking.com</h2>
 
         <input
           type="file"
@@ -120,108 +118,112 @@ export default function BulkBookingPage() {
           onChange={(e) =>
             e.target.files && handleExcelUpload(e.target.files[0])
           }
-          className="mb-4"
         />
+      </div>
 
-        {rows.length === 0 && (
-          <p className="text-gray-500 text-sm">
-            Upload a Booking.com Excel (.xls / .xlsx) file
-          </p>
-        )}
+      {rows.length === 0 && (
+        <p className="text-gray-500">Upload a Booking.com Excel file</p>
+      )}
 
-        {rows.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border rounded">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="border p-2">Book Number</th>
-                  <th className="border p-2">Guest Name</th>
-                  <th className="border p-2">Check-In</th>
-                  <th className="border p-2">Check-Out</th>
-                  <th className="border p-2">Unit Type</th>
-                  <th className="border p-2">Property</th>
-                  <th className="border p-2">Payment</th>
-                  <th className="border p-2">Status</th>
-                </tr>
-              </thead>
+      {/* ================= CARD GRID ================= */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map((r) => (
+          <div
+            key={r.rowId}
+            className={`rounded-xl border p-4 shadow-sm transition
+              ${
+                r.status === "saved"
+                  ? "bg-green-50 border-green-300"
+                  : "bg-white"
+              }
+            `}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <p className="text-sm text-gray-500">Book Number</p>
+                <p className="font-semibold">{r.reservationId}</p>
+              </div>
 
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.rowId} className="text-center">
-                    <td className="border p-2">{r.reservationId}</td>
-                    <td className="border p-2">{r.guestName}</td>
-                    <td className="border p-2">{r.checkInDate}</td>
-                    <td className="border p-2">{r.checkOutDate}</td>
-                    <td className="border p-2">{r.unitType}</td>
+              {r.status === "saved" && (
+                <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
+                  Saved
+                </span>
+              )}
+            </div>
 
-                    <td className="border p-2">
-                      <select
-                        className="border rounded p-1 w-full"
-                        value={r.propertyId}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((x) =>
-                              x.rowId === r.rowId
-                                ? { ...x, propertyId: e.target.value }
-                                : x
-                            )
-                          )
-                        }
-                      >
-                        <option value="">Select Property</option>
-                        {properties.map((p) => (
-                          <option key={p._id} value={p._id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+            {/* Info */}
+            <div className="text-sm space-y-1 mb-3">
+              <p>
+                <span className="text-gray-500">Guest:</span>{" "}
+                <b>{r.guestName}</b>
+              </p>
+              <p>
+                <span className="text-gray-500">Dates:</span> {r.checkInDate} →{" "}
+                {r.checkOutDate}
+              </p>
+              <p>
+                <span className="text-gray-500">Unit:</span> {r.unitType}
+              </p>
+            </div>
 
-                    <td className="border p-2">
-                      <select
-                        className="border rounded p-1 w-full"
-                        value={r.paymentMethod}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((x) =>
-                              x.rowId === r.rowId
-                                ? {
-                                    ...x,
-                                    paymentMethod: e.target
-                                      .value as ImportedBooking["paymentMethod"],
-                                  }
-                                : x
-                            )
-                          )
-                        }
-                      >
-                        <option value="online">Online</option>
-                        <option value="bank">Bank</option>
-                        <option value="cash">Cash</option>
-                      </select>
-                    </td>
+            {/* Controls */}
+            {r.status !== "saved" && (
+              <>
+                <select
+                  className="border rounded p-2 w-full mb-2"
+                  value={r.propertyId}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((x) =>
+                        x.rowId === r.rowId
+                          ? { ...x, propertyId: e.target.value }
+                          : x
+                      )
+                    )
+                  }
+                >
+                  <option value="">Select Property</option>
+                  {properties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
 
-                    <td className="border p-2">
-                      {r.status === "saved" ? (
-                        <span className="text-green-600 font-medium">
-                          ✔ Saved
-                        </span>
-                      ) : (
-                        <button
-                          disabled={!r.propertyId}
-                          onClick={() => saveBooking.mutate(r)}
-                          className="bg-black text-white px-3 py-1 rounded text-xs disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                <select
+                  className="border rounded p-2 w-full mb-3"
+                  value={r.paymentMethod}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((x) =>
+                        x.rowId === r.rowId
+                          ? {
+                              ...x,
+                              paymentMethod: e.target
+                                .value as ImportedBooking["paymentMethod"],
+                            }
+                          : x
+                      )
+                    )
+                  }
+                >
+                  <option value="online">Online</option>
+                  <option value="bank">Bank</option>
+                  <option value="cash">Cash</option>
+                </select>
+
+                <button
+                  disabled={!r.propertyId}
+                  onClick={() => saveBooking.mutate(r)}
+                  className="w-full bg-black text-white py-2 rounded disabled:opacity-50"
+                >
+                  Save Booking
+                </button>
+              </>
+            )}
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
