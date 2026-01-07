@@ -13,7 +13,8 @@ interface Property {
 }
 
 interface ImportedBooking {
-  reservationId: string;
+  rowId: string; // 🔥 internal unique key
+  reservationId: string; // Booking.com → Book number
   guestName: string;
   checkInDate: string;
   checkOutDate: string;
@@ -50,19 +51,17 @@ export default function BulkBookingPage() {
       if (!data) return;
 
       const workbook = XLSX.read(data, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
       const json = XLSX.utils.sheet_to_json<any>(sheet);
 
       const parsed: ImportedBooking[] = json.map((r) => ({
-        reservationId: String(
-          r.bookNumber || r.reservationId || r["Reservation number"] || ""
-        ),
-        guestName: r.guestName || r.bookedBy || r["Booked by"] || "Unknown",
-        checkInDate: r.checkInDate || r["Check-in"] || r["Check in"] || "",
-        checkOutDate: r.checkOutDate || r["Check-out"] || r["Check out"] || "",
-        unitType: r.unitType || r.roomType || r["Unit type"] || "",
+        rowId: crypto.randomUUID(), // ✅ stable React key
+        reservationId: String(r["Book number"] || ""),
+        guestName: r["Guest name"] || r["Booked by"] || "Unknown",
+        checkInDate: r["Check-in"] || r["Check in"] || "",
+        checkOutDate: r["Check-out"] || r["Check out"] || "",
+        unitType: r["Unit type"] || r["Room type"] || "",
         propertyId: "",
         paymentMethod: "online",
         status: "pending",
@@ -99,9 +98,7 @@ export default function BulkBookingPage() {
     },
     onSuccess: (_, row) => {
       setRows((prev) =>
-        prev.map((r) =>
-          r.reservationId === row.reservationId ? { ...r, status: "saved" } : r
-        )
+        prev.map((r) => (r.rowId === row.rowId ? { ...r, status: "saved" } : r))
       );
       qc.invalidateQueries({ queryKey: ["occupancies"] });
     },
@@ -137,7 +134,7 @@ export default function BulkBookingPage() {
             <table className="w-full text-sm border rounded">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="border p-2">Reservation ID</th>
+                  <th className="border p-2">Book Number</th>
                   <th className="border p-2">Guest Name</th>
                   <th className="border p-2">Check-In</th>
                   <th className="border p-2">Check-Out</th>
@@ -150,7 +147,7 @@ export default function BulkBookingPage() {
 
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.reservationId} className="text-center">
+                  <tr key={r.rowId} className="text-center">
                     <td className="border p-2">{r.reservationId}</td>
                     <td className="border p-2">{r.guestName}</td>
                     <td className="border p-2">{r.checkInDate}</td>
@@ -164,7 +161,7 @@ export default function BulkBookingPage() {
                         onChange={(e) =>
                           setRows((prev) =>
                             prev.map((x) =>
-                              x.reservationId === r.reservationId
+                              x.rowId === r.rowId
                                 ? { ...x, propertyId: e.target.value }
                                 : x
                             )
@@ -187,7 +184,7 @@ export default function BulkBookingPage() {
                         onChange={(e) =>
                           setRows((prev) =>
                             prev.map((x) =>
-                              x.reservationId === r.reservationId
+                              x.rowId === r.rowId
                                 ? {
                                     ...x,
                                     paymentMethod: e.target
